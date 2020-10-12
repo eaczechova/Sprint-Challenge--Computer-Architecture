@@ -26,13 +26,16 @@ class CPU:
         self.reg[SP] = 255
         self.pc = 0
         self.halted = False
-        self.flag = 0b00000000 #0
+        # flag register changes based on the operands given to the CMP opcode
+        self.FL = {"E": 0, "L": 0, "G": 0
+        }
 
-    def ram_read(self, address): # address could be replaces with MAR
+    def ram_read(self, address): # access RAM within CPU object
         return self.ram[address]
 
-    def ram_write(self, address, val):
+    def ram_write(self, address, val): # access RAM within CPU object
         self.ram[address] = val
+        return self.ram[address]
 
     def load(self):
         """Load a program into memory."""
@@ -48,28 +51,33 @@ class CPU:
                     n = line.split("#", 1)[0]
                     if n.strip() == "":
                         continue
-                    value = int(n, 2)
+                    value = int(n, 2) # convert binary string to integer
                     self.ram[address] = value
                     address += 1 
-        print(self.reg)
     
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
-
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        # elif op == "MUL":
-        #     self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "MUL":
+            self.reg[reg_a] *= self.reg[reg_b]
         elif op == "CMP":
             if self.reg[reg_a] == self.reg[reg_b]:
-                # flag E
-                self.flag = 0b00000001
+                # FL E
+                self.FL["G"] = 0b00000000
+                self.FL["E"] = 0b00000001
+                self.FL["L"] = 0b00000000
+
             elif self.reg[reg_a] < self.reg[reg_b]:
-                # flag L
-                self.flag = 0b00000100
+                # FL L
+                self.FL["G"] = 0b00000000
+                self.FL["E"] = 0b00000000
+                self.FL["L"] = 0b00000001 
             elif self.reg[reg_a] > self.reg[reg_b]:
-                # flag G
-                self.flag = 0b00000010
+                # FL G
+                self.FL["G"] = 0b00000001
+                self.FL["E"] = 0b00000000
+                self.FL["L"] = 0b00000000
         else:
             raise Exception("Unsupported ALU operation")
     
@@ -136,41 +144,21 @@ class CPU:
                 self.reg[SP] += 1
                 self.pc += 2
 
-            elif instruction == CMP: # compare the values in two registers
+            elif instruction == CMP: # compare values in two registers
                 self.alu("CMP", value1, value2)
                 self.pc += 3
-            elif instruction == JMP:
-                self.pc = self.reg[self.ram_read(self.pc + 1)]
-            elif instruction == JEQ:
-                if self.flag == 0b00000001:
-                    self.pc = self.reg[self.ram_read(self.pc + 1)]
+
+            elif instruction == JMP: # jump to the address stored in the given register
+                self.pc = self.reg[value1]
+
+            elif instruction == JEQ: # if equal FL is set (true), jump to the address stored in the given register
+                if self.FL["E"] == 1:
+                    self.pc = self.reg[value1]
                 else:
                     self.pc += 2
 
-            elif instruction == JNE:
-                if self.flag != 0b00000001:
-                    self.pc = self.reg[self.ram_read(self.pc + 1)]
+            elif instruction == JNE: # if E FL is clear (false, 0), jump to the address stored in the given register
+                if self.FL["E"] == 0b00000000:
+                   self.pc = self.reg[value1]
                 else:
                     self.pc += 2
-            # else:
-            #     self.halted = False
-
-
-            
-
-
-            # elif instruction == CAL:
-            #     # store val of next instruction to the stack
-            #     self.reg[SP] -= 1
-            #     address = self.pc + 2
-            #     self.ram[self.reg[SP]] = address
-            #     # jump to address stored in the given register
-            #     red_address_from = self.ram[self.pc +1]
-            #     address_to_jump = self.reg[red_address_from]
-            #     self.pc = address_to_jump
-            # elif instruction == RET:
-            #     # pop the most top value of the stack
-            #     address_to_return = self.ram[self.reg[SP]]
-            #     self.ram[self.reg[SP]] += 1
-            #     self.pc = address_to_return
-    
